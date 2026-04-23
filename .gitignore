@@ -1,0 +1,6 @@
+*.env
+*.pyc
+tests/*
+venv/*
+.vscode/*
+pytest.ini
