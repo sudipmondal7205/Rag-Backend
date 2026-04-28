@@ -1,8 +1,12 @@
 *.env
 *.pyc
+*.ipynb
+
+
 tests/*
 venv/*
 .vscode/*
-pytest.ini
 
+
+pytest.ini
 test.py
