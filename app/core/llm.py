@@ -12,5 +12,4 @@ def get_llm():
 
     return llm
 
-
 llm =  get_llm()
