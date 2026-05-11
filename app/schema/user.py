@@ -14,3 +14,10 @@ class UserResponse(BaseModel):
     email: str
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UserLogin(BaseModel):
+    name: str
+    password: str
+
+    model_config = ConfigDict(from_attributes=True)

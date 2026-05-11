@@ -1,31 +1,32 @@
-from http import HTTPStatus
+from fastapi import APIRouter, Depends
+from app.api.deps import get_current_user, get_user_service
+from app.models.user import User
+from app.services.user_service import UserService
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel.ext.asyncio.session import AsyncSession
-from app.db.session import get_session
-from app.exceptions.user_exceptions import UserAlreadyExistsException
-from app.schema.user import UserCreate
-from app.services.user_service import userService
 
 
 router = APIRouter(prefix="/user", tags=["User"])
 
 
-@router.post("/")
-async def create_user(
-        user_data: UserCreate,
-        session: AsyncSession = Depends(get_session)
+
+@router.get("/get-user/all")
+async def get_all_users(
+        user_service: UserService = Depends(get_user_service)
     ):
-    
-    return await userService.register_user(user_data, session)
-    
+    return await user_service.get_all_users()
 
 
+@router.get("/get-user/{user_id}")
+async def get_user_by_id(
+        user_id: int,
+        user_service: UserService = Depends(get_user_service)
+    ):
+    return await user_service.get_user_by_id(user_id)
 
-@router.get("/all")
-async def get_all_users(session: AsyncSession = Depends(get_session)):
-    return await userService.get_all_users(session)
 
-
-
-
+@router.delete("/delete-user")
+async def delete_user(
+        user: User = Depends(get_current_user),
+        user_service: UserService = Depends(get_user_service)
+    ):
+    return await user_service.delete_user(user)

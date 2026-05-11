@@ -4,8 +4,8 @@ from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
 from pydantic import BaseModel, Field
 
-from app.core.embeddings import get_embedding
-from app.core.pinecone_client import get_index
+from app.core.embeddings import embedding_model
+from app.core.pinecone_client import pinecone_index
 
 
 
@@ -14,39 +14,38 @@ class RetrieverInput(BaseModel):
 
 
 
-@tool("retriever", args_schema=RetrieverInput)
-def retriever_tool(query: str, state: Annotated[dict, InjectedState]):
+@tool("retriever", args_schema=RetrieverInput, response_format="content_and_artifact")
+async def retriever_tool(query: str, state: Annotated[dict, InjectedState]):
     """
         Search the knowledge base for the query relevant information. 
         It will return top 3 relavent docs, use only related docs to answer.
     """
 
-    result = query_documents(
+    result = await query_documents(
         query=query,
-        doc_id=state['doc_id'],
-        index=get_index(),
-        embed_fn=get_embedding
+        doc_id=state['doc_id']
     )
 
-    # docs = [m['metadata']['text'] for m in result.matches]
-
-    return {
-        "retrieved_docs": result
+    docs = [m['metadata']['text'] for m in result.matches]
+    artifact = {
+        'page_no': [m['metadata']['page_no'] for m in result.matches],
+        'score': [m['score'] for m in result.matches]
     }
+    return docs, artifact
 
 
-def query_documents(query: str, index, embed_fn, doc_id: str):
+async def query_documents(query: str, doc_id: str):
 
-        vector = embed_fn([query])[0]
+    vector = await embedding_model.aembed_query(query)
 
-        results = index.query(
-            vector=vector,
-            top_k=3,
-            include_metadata=True,
-            filter={
-                "doc_id": doc_id
-            }
-        )
+    results = pinecone_index.query(
+        vector=vector,
+        top_k=3,
+        include_metadata=True,
+        filter={
+            "doc_id": doc_id
+        }
+    )
 
-        return results
+    return results
 

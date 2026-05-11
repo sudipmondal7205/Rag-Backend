@@ -1,10 +1,11 @@
 from http import HTTPStatus
-from app.exceptions.base import AppException
+
+from fastapi import HTTPException
 
 
-class ConversationNotFoundException(AppException):
-    def __init__(self):
+class ConversationNotFoundException(HTTPException):
+    def __init__(self, id):
         super().__init__(
-            message="Conversation not found exception!!!",
-            status_code=HTTPStatus.NOT_FOUND
+            status_code=HTTPStatus.NOT_FOUND, 
+            detail=f"Conversation with id '{id}' not found!!!"
         )

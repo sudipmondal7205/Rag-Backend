@@ -18,9 +18,11 @@ class Settings(BaseSettings) :
 
     COHERE_API_KEY: str
 
+
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = 'HS256'
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 240
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 2000
+
 
     @property
     def CONV_DB_URL(self) -> str:
@@ -28,15 +30,28 @@ class Settings(BaseSettings) :
             f"{self.DB}://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         )
     
+
     @property
     def USER_DB_URL(self) -> str:
         return (
             f"{self.DB}+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         )
     
+    
     PINECONE_DB_API_KEY: str
     PINECONE_INDEX_NAME: str
     EMBEDDING_DIMENSION: int
+
+
+    REDIS_URI: str
+    REDIS_MEMORY_TIME: int = 3600
+
+
+    GMAIL_REFRESH_TOKEN: str
+    GMAIL_CLIENT_ID: str
+    GMAIL_CLIENT_SECRET: str
+    GMAIL_SENDER: str
+
     
     @property
     def API_VERSION_PREFIX(self) -> str:
@@ -47,5 +62,7 @@ class Settings(BaseSettings) :
     class Config:
         env_file = ".env"
         extra = "ignore"
+
+
 
 settings = Settings()

@@ -1,6 +1,7 @@
 import re
 from typing import Coroutine
 
+from httpx import delete
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from app.models.user import User
@@ -30,7 +31,7 @@ class UserRepository:
         return result.all()
 
 
-    async def get_user_by_email(self, session: AsyncSession, email: str):
+    async def get_user_by_email(self, session: AsyncSession, email: str) -> User:
         statement = (
             select(User).where(User.email == email)
         )
@@ -38,13 +39,17 @@ class UserRepository:
         return result.first()
     
 
-    async def get_user_by_name(self, session: AsyncSession, name: str):
+    async def get_user_by_name(self, session: AsyncSession, name: str) -> User:
         statement = (
             select(User).where(User.name == name)
         )
         result = await session.exec(statement)
         return result.first()
     
+
+    async def delete_user(self, session: AsyncSession, user: User):
+        session.delete(user)
+        await session.flush()
 
 
 userRepository = UserRepository()

@@ -12,10 +12,8 @@ class ConversationRepository:
 
 
     async def create_conversation(self, session: AsyncSession, conversation: Conversation) -> Conversation:
-        
-        async with session.begin():
-            session.add(conversation)
-
+        session.add(conversation)
+        await session.flush()
         await session.refresh(conversation)
         return conversation
 

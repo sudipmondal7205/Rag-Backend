@@ -1,10 +1,8 @@
-from functools import cache
-
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.prompts import ChatPromptTemplate
-from app.core.pinecone_client import get_index
+from app.core.pinecone_client import pinecone_index
 from langchain_core.documents import Document
-from app.core.embeddings import get_embedding
+from app.core.embeddings import embedding_model
 from fastapi import UploadFile
 from app.core.llm import llm
 import uuid
@@ -16,62 +14,66 @@ class DocumentService:
 
     def __init__(self):
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=100
+            chunk_size=500,
+            chunk_overlap=15
         )
         self.llm = llm
 
 
-
-    async def process_pdf(self, file: UploadFile):
+    async def process_pdf(self, file: UploadFile, ):
         
         stream = await file.read()
 
         docs = []
         with fitz.open(stream=stream, filetype='pdf') as doc:
-            for page_num, page in enumerate(doc):
+            for page_no, page in enumerate(doc):
 
                 docs.append(
-                    Document(page_content=page.get_text())
+                    Document(
+                        page_content=page.get_text(),
+                        metadata={
+                            'page_no': page_no
+                        }
+                    )
                 )
 
         list_docs = await self.split_document(docs)
-        texts = [doc.page_content for doc in list_docs]
 
         title = await self.generate_title(list_docs[0])
         doc_id = str(uuid.uuid4())
 
-        await self.upsert_document(texts, doc_id)
+        await self.upsert_document(list_docs, doc_id)
 
         return doc_id, title
     
 
 
-    async def split_document(self, docs):
-
+    async def split_document(self, docs: list[Document]):
         chunks = self.text_splitter.split_documents(docs)
-
         return chunks
 
 
 
-    async def upsert_document(self, texts: list[str], doc_id: str):
+    async def upsert_document(self, documents: list[Document], doc_id: str):
 
-        embeddings = get_embedding(texts)
-        index = get_index()
+        texts = [doc.page_content for doc in documents]
+        embeddings = await embedding_model.aembed_documents(texts)
 
         vectors = []
-        for i, (text, emb) in enumerate(zip(texts, embeddings)):
+        
+        for doc, emb in zip(documents, embeddings):
             vectors.append({
                 "id": str(uuid.uuid4()),
                 "values": emb,
                 "metadata": {
                     "doc_id": doc_id,
-                    "text": text
+                    "text": doc.page_content,
+                    "page_no": doc.metadata.get("page_no")
                 }
             })
 
-        index.upsert(vectors)
+        pinecone_index.upsert(vectors)
+
 
 
     async def generate_title(self, document: Document) -> str:

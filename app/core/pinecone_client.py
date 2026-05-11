@@ -28,3 +28,6 @@ def get_index() :
             )
         )
     return pc.Index(settings.PINECONE_INDEX_NAME)
+
+
+pinecone_index = get_index()
