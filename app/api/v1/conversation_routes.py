@@ -65,3 +65,12 @@ async def create_conversation(
     ):
     return await conversationService.create_conversation(session, conversation)
 
+
+@router.post("/chat-with-agent/streaming")
+async def chat_with_agent_stream(
+        input_query: InputQuery,
+        session: AsyncSession = Depends(get_session),
+        current_user: User = Depends(get_current_user)
+    ):
+    return await chatService.ask_question_stream(session, input_query, current_user)
+    

@@ -1,5 +1,6 @@
 from typing import Annotated
 
+from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
 from pydantic import BaseModel, Field
@@ -26,12 +27,16 @@ async def retriever_tool(query: str, state: Annotated[dict, InjectedState]):
         doc_id=state['doc_id']
     )
 
-    docs = [m['metadata']['text'] for m in result.matches]
+    docs = "\n\n".join(
+        m["metadata"]["text"]
+        for m in result.matches
+    )
+    
     artifact = {
-        'page_no': [m['metadata']['page_no'] for m in result.matches],
-        'score': [m['score'] for m in result.matches]
+        "sources": [{'page_no': m['metadata']['page_no'], 'score': m['score']} for m in result.matches]
     }
-    return docs, artifact
+    return (docs, artifact)
+
 
 
 async def query_documents(query: str, doc_id: str):

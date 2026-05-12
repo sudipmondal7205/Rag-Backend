@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import EmailStr
 from app.api.deps import get_auth_service
 from app.schema.user import UserCreate, UserLogin
@@ -10,10 +11,15 @@ router = APIRouter(prefix="/auth")
 
 @router.post("/login")
 async def login_user(
-        user_data: UserLogin,
+        user_data: OAuth2PasswordRequestForm = Depends(),
         auth_service: AuthService = Depends(get_auth_service)
     ):
-    return await auth_service.authenticate_user(user_data)
+    access_token = await auth_service.authenticate_user(user_data)
+
+    return {
+        'access_token': access_token,
+        'token_type': 'bearer'
+    }
 
 
 @router.post("/create-user/register")

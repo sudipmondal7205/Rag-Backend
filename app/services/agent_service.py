@@ -1,3 +1,4 @@
+from fastapi.responses import StreamingResponse
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.prebuilt import ToolNode, tools_condition
 from app.core.llm import llm
@@ -7,6 +8,8 @@ from app.exceptions.conversation_exception import ConversationNotFoundException
 from app.models.user import User
 from app.schema.agent_schema import AgentState
 from app.schema.chat_schema import ChatResponse, InputQuery
+from app.schema.stream_events import DoneEvent
+from app.streaming.transformer import transform_events
 from app.tools import TOOLS
 from langchain_core.messages import HumanMessage
 from app.services.conversation_service import conversationService
@@ -74,6 +77,39 @@ class ChatService:
         final_state = await agent.ainvoke(state, config=config)
     
         return ChatResponse.model_validate(final_state['messages'][-1])
+
+
+
+    async def ask_question_stream(self, session: AsyncSession, input_query: InputQuery, user: User):
+
+        config = {"configurable": {"thread_id": input_query.thread_id}}
+
+        conversation = await self.conv_service.get_conversation_by_id(session, input_query.thread_id)
+        if conversation is None or (conversation.user_id != user.id):
+            raise ConversationNotFoundException(conversation.id)
+        
+        state = {
+            "messages": [HumanMessage(content=input_query.query)],
+            "doc_id": conversation.doc_id
+        }
+
+        agent = await self._get_agent()
+
+        async def event_generator():
+            async for event in agent.astream_events(state, config=config, version='v2'):
+                
+                transformed = transform_events(event)
+                if transformed:
+                    yield transformed.model_dump_json() + "\n"
+            
+            yield DoneEvent(
+                type="done"
+            ).model_dump_json() + "\n"
+
+        return StreamingResponse(
+            event_generator(),
+            media_type="application/x-ndjson"
+        )
 
 
 
