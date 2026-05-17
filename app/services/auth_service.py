@@ -1,5 +1,6 @@
 from http import HTTPStatus
 import secrets
+from fastapi.security import OAuth2PasswordRequestForm
 from redis import Redis
 from app.core.config import settings
 from app.core.security import create_access_token, hash_password, verify_password
@@ -7,7 +8,7 @@ from app.exceptions.security_exception import CredentialException, VerificationE
 from app.exceptions.user_exceptions import UserAlreadyExistsException, UserNotFoundException
 from app.models.user import User
 from app.repository.user_repo import UserRepository
-from app.schema.user import UserCreate, UserLogin, UserResponse
+from app.schema.user import UserCreate, UserLogin, UserResponse, UserVerifySchema
 from sqlmodel.ext.asyncio.session import AsyncSession
 from app.services.email_service import EmailService
 
@@ -28,16 +29,19 @@ class AuthService():
 
 
     
-    async def authenticate_user(self, user_data: UserLogin) -> str:
-        user = await self.user_repo.get_user_by_name(self.session, user_data.name)
+    async def authenticate_user(self, user_data: OAuth2PasswordRequestForm) -> str:
+        user = await self.user_repo.get_user_by_name(self.session, user_data.username)
         
         if user is None:
-            raise UserNotFoundException(user_data.name)
+            raise UserNotFoundException(user_data.username)
         
         if not verify_password(user_data.password, user.password):
             raise CredentialException(HTTPStatus.UNAUTHORIZED, detail="Password did not match")
-            
-        return create_access_token(user_data.model_dump())
+        
+        return create_access_token({
+            'name': user_data.username,
+            'password': user_data.password
+        })
     
 
 
@@ -60,14 +64,14 @@ class AuthService():
     
 
 
-    async def verify_user_email(self, email: str, code_from_user: str):
+    async def verify_user_email(self, data: UserVerifySchema):
 
-        stored_code = await self.redis_client.get(f'verification_code:{email}')
+        stored_code = await self.redis_client.get(f'verification_code:{data.email}')
 
-        if stored_code is None or stored_code != code_from_user:
+        if stored_code is None or stored_code != data.verification_code:
             raise VerificationException("Verification failed!!!")
         
-        user_data = await self.redis_client.get(f'temp_user:{email}')
+        user_data = await self.redis_client.get(f'temp_user:{data.email}')
         if user_data is None:
             raise VerificationException("Verification failed!!!")
         

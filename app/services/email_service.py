@@ -28,7 +28,7 @@ class EmailService():
 
 
     async def send_email(self, email_to: str, content: str, subject: str):
-        self._refresh_token_if_expired()
+        await self._refresh_token_if_expired()
 
         service = build("gmail", "v1", credentials=self.creds)
 

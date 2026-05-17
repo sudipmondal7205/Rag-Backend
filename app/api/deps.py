@@ -10,7 +10,9 @@ from app.core.security import verify_password
 from app.db.session import get_session
 from app.exceptions.security_exception import CredentialException
 from app.models.user import User
+from app.repository.conversation_repo import conversationRepository
 from app.repository.user_repo import userRepository
+from app.services.document_service import DocumentService
 from app.services.email_service import email_service
 from app.services.auth_service import AuthService
 from app.services.user_service import UserService
@@ -27,7 +29,6 @@ async def get_current_user(
     
     try:
         payload = jwt.decode(token=token, key=settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-        print(payload)
         name = payload.get('name')
         password = payload.get('password')
 
@@ -57,3 +58,9 @@ async def get_auth_service(
         redis: Redis = Depends(get_redis_client),
     ):
     return AuthService(session, userRepository, redis, email_service)
+
+
+async def get_doc_service(
+        session: AsyncSession = Depends(get_session)
+    ):
+    return DocumentService(session, conversationRepository)

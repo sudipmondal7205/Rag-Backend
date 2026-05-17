@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import EmailStr
 from app.api.deps import get_auth_service
-from app.schema.user import UserCreate, UserLogin
+from app.schema.user import UserCreate, UserLogin, UserVerifySchema
 from app.services.auth_service import AuthService
 
 
@@ -32,8 +32,7 @@ async def register(
 
 @router.post("/create-user/verify")
 async def verify(
-        email: EmailStr,
-        verification_code: str,
+        data: UserVerifySchema,
         auth_service: AuthService = Depends(get_auth_service)
     ):
-    return await auth_service.verify_user_email(email, verification_code)
+    return await auth_service.verify_user_email(data)

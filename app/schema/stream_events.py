@@ -4,6 +4,8 @@ from typing import Any, Optional
 import uuid
 from pydantic import BaseModel
 
+from app.schema.conversation import ConversationResponse
+
 
 
 class InputQuery(BaseModel):
@@ -92,3 +94,11 @@ StreamEvent = Union[
     ErrorEvent,
     DoneEvent
 ]
+
+
+
+
+class DocUploadEvent(BaseModel):
+    percentage: int
+    status: Literal["Uploading...", "Done"]
+    conversation: ConversationResponse = None

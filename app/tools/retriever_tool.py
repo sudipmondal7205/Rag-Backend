@@ -1,10 +1,7 @@
 from typing import Annotated
-
-from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
 from pydantic import BaseModel, Field
-
 from app.core.embeddings import embedding_model
 from app.core.pinecone_client import pinecone_index
 
@@ -26,14 +23,14 @@ async def retriever_tool(query: str, state: Annotated[dict, InjectedState]):
         query=query,
         doc_id=state['doc_id']
     )
+    state['tool_call_count'] = state.get('tool_call_count', 0) + 1
 
     docs = "\n\n".join(
         m["metadata"]["text"]
         for m in result.matches
     )
-    
     artifact = {
-        "sources": [{'page_no': m['metadata']['page_no'], 'score': m['score']} for m in result.matches]
+        "sources": [{'file_name': m['metadata']['file_name'], 'page_no': m['metadata']['page_no'], 'score': m['score']} for m in result.matches]
     }
     return (docs, artifact)
 
@@ -42,7 +39,6 @@ async def retriever_tool(query: str, state: Annotated[dict, InjectedState]):
 async def query_documents(query: str, doc_id: str):
 
     vector = await embedding_model.aembed_query(query)
-
     results = pinecone_index.query(
         vector=vector,
         top_k=3,
@@ -51,6 +47,5 @@ async def query_documents(query: str, doc_id: str):
             "doc_id": doc_id
         }
     )
-
     return results
 

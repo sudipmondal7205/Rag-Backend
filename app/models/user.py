@@ -11,7 +11,7 @@ class User(SQLModel, table = True) :
     name: str = Field(unique=True, index=True)
     password: str
     email: str = Field(unique=True, index=True)
-
+    
     conversations: List["Conversation"] = Relationship(
         back_populates="user",
         sa_relationship_kwargs={

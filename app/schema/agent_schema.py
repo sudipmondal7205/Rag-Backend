@@ -6,3 +6,4 @@ from langgraph.graph import add_messages
 class AgentState(TypedDict):
     messages: Annotated[List[BaseMessage], add_messages]
     doc_id: str
+    tool_call_count: int = 0

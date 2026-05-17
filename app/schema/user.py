@@ -21,3 +21,8 @@ class UserLogin(BaseModel):
     password: str
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UserVerifySchema(BaseModel):
+    email: EmailStr
+    verification_code: str

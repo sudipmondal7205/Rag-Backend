@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta, timezone
+from http import HTTPStatus
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
+from fastapi import HTTPException
 from jose import jwt
 from app.core.config import settings
 
@@ -18,8 +20,12 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
         return ph.verify(hashed_password, plain_password)
+    
     except VerifyMismatchError:
         return False
+    
+    except Exception as e:
+        raise HTTPException(status_code=HTTPStatus.UNAUTHORIZED, detail=str(e))
 
 
 def create_access_token(data: dict) -> str:

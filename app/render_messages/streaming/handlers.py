@@ -1,17 +1,28 @@
-from app.schema.stream_events import TokenEvent, ToolEndEvent, ToolStartEvent
+from app.schema.stream_events import StatusEvent, TokenEvent, ToolEndEvent, ToolStartEvent
 
 
 def handle_chat_stream(event):
 
     chunk = event['data']['chunk']
-
     if chunk.content:
         return TokenEvent(
             type='token',
             content=chunk.content
         )
+            
     return None
 
+
+def handle_status_event(event):
+    chunk = event['data']['chunk']
+    return StatusEvent(
+        type='status',
+        message=chunk.content
+    )
+
+
+def handle_source_event(event):
+    pass
 
 
 def handle_tool_start(event):
