@@ -1,6 +1,5 @@
 from pinecone import Pinecone, ServerlessSpec
 from app.core.config import settings
-import os
 
 
 def get_pinecone_client():

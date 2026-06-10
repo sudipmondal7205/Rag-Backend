@@ -18,7 +18,7 @@ class EmailService():
             client_secret=settings.GMAIL_CLIENT_SECRET,
             scopes=["https://www.googleapis.com/auth/gmail.send"]
         )
-    
+
 
     async def _refresh_token_if_expired(self):
 

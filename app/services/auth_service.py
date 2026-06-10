@@ -39,8 +39,8 @@ class AuthService():
             raise CredentialException(HTTPStatus.UNAUTHORIZED, detail="Password did not match")
         
         return create_access_token({
-            'name': user_data.username,
-            'password': user_data.password
+            'id': str(user.id),
+            'name': user.name
         })
     
 
@@ -52,7 +52,7 @@ class AuthService():
             raise UserAlreadyExistsException(user_data.name)
 
         code = str(secrets.randbelow(1000000)).zfill(6)
-
+        print("OTP: ", code)
         await self.redis_client.setex(f'verification_code:{user_data.email}', settings.REDIS_MEMORY_TIME, code)
         await self.redis_client.setex(f'temp_user:{user_data.email}', settings.REDIS_MEMORY_TIME, user_data.model_dump_json())
 

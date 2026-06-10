@@ -26,3 +26,8 @@ class UserLogin(BaseModel):
 class UserVerifySchema(BaseModel):
     email: EmailStr
     verification_code: str
+
+
+class TokenUser(BaseModel):
+    id: uuid.UUID
+    name: str

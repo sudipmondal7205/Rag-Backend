@@ -17,6 +17,13 @@ class ConversationRepository:
         return conversation
 
 
+    async def update_conversation(self, session: AsyncSession, conversation: Conversation) -> Conversation:
+        session.add(conversation)
+        await session.flush()
+        await session.refresh(conversation)
+        return conversation
+
+
     async def get_conversations_by_user(self, session: AsyncSession, user_id: uuid.UUID):
         statement = (
             select(Conversation)

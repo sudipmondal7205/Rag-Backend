@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import EmailStr
@@ -6,13 +8,13 @@ from app.schema.user import UserCreate, UserLogin, UserVerifySchema
 from app.services.auth_service import AuthService
 
 
-router = APIRouter(prefix="/auth")
+router = APIRouter(prefix="/auth", tags=['auth'])
 
 
 @router.post("/login")
 async def login_user(
-        user_data: OAuth2PasswordRequestForm = Depends(),
-        auth_service: AuthService = Depends(get_auth_service)
+        user_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+        auth_service: Annotated[AuthService, Depends(get_auth_service)]
     ):
     access_token = await auth_service.authenticate_user(user_data)
 
@@ -25,7 +27,7 @@ async def login_user(
 @router.post("/create-user/register")
 async def register(
         user_data: UserCreate,
-        auth_service: AuthService = Depends(get_auth_service)    
+        auth_service: Annotated[AuthService, Depends(get_auth_service) ]   
     ):
     return await auth_service.initiate_user_registration(user_data)
 
@@ -33,6 +35,6 @@ async def register(
 @router.post("/create-user/verify")
 async def verify(
         data: UserVerifySchema,
-        auth_service: AuthService = Depends(get_auth_service)
+        auth_service: Annotated[AuthService, Depends(get_auth_service)]
     ):
     return await auth_service.verify_user_email(data)

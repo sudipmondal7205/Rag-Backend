@@ -1,5 +1,6 @@
 import re
 from typing import Coroutine
+import uuid
 
 from httpx import delete
 from sqlmodel import select
@@ -14,7 +15,7 @@ class UserRepository:
     def __init__(self):
         pass
 
-    async def get_user_by_id(self, session: AsyncSession, user_id):
+    async def get_user_by_id(self, session: AsyncSession, user_id: uuid.UUID):
         return await session.get(User, user_id)
 
 
@@ -48,7 +49,7 @@ class UserRepository:
     
 
     async def delete_user(self, session: AsyncSession, user: User):
-        session.delete(user)
+        await session.delete(user)
         await session.flush()
 
 

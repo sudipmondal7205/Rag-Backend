@@ -8,3 +8,5 @@ class FileException(HTTPException):
             status_code=HTTPStatus.INTERNAL_SERVER_ERROR, 
             detail=detail
         )
+
+

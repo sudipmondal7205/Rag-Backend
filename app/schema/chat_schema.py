@@ -16,9 +16,17 @@ class ChatSource(BaseModel):
     file_name: str = ""
     page_no: int | None = None
     score: float | None = None
-
+    preview: str = ""
 
 class ChatMessage(BaseModel):
     role: Literal['user', 'assistant']
     content: str
+
+
+class ChatUserMessage(ChatMessage):
+    role: Literal['user']
+
+
+class ChatAiMessage(ChatMessage):
+    role: Literal['assistant']
     sources: List[ChatSource] = []

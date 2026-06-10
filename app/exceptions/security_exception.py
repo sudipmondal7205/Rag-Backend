@@ -14,3 +14,12 @@ class VerificationException(HTTPException):
             status_code=HTTPStatus.UNAUTHORIZED, 
             detail=detail
         )
+
+
+class UnauthorizedUserException(HTTPException):
+    def __init__(self, detail = None, headers = None):
+        super().__init__(
+            status_code=HTTPStatus.UNAUTHORIZED, 
+            detail=detail,
+            headers=headers
+        )

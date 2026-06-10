@@ -1,3 +1,4 @@
+from typing import AsyncIterator
 from app.core.config import settings
 from psycopg_pool import AsyncConnectionPool
 from psycopg.rows import dict_row
@@ -9,3 +10,7 @@ pool = AsyncConnectionPool(
     open=False,
     kwargs={"autocommit": True, "row_factory": dict_row}
 )
+
+
+async def get_db_pool() -> AsyncIterator[AsyncConnectionPool]:
+    yield pool

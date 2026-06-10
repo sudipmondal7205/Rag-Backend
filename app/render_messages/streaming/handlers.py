@@ -1,4 +1,6 @@
-from app.schema.stream_events import StatusEvent, TokenEvent, ToolEndEvent, ToolStartEvent
+from pprint import pprint
+
+from app.schema.stream_events import Source, SourcesEvent, StatusEvent, TokenEvent, ToolEndEvent, ToolStartEvent
 
 
 def handle_chat_stream(event):
@@ -9,7 +11,7 @@ def handle_chat_stream(event):
             type='token',
             content=chunk.content
         )
-            
+    
     return None
 
 
@@ -40,4 +42,30 @@ def handle_tool_end(event):
         type='tool_end',
         tool=event['name'],
         output=event['data']['output'].artifact
+    )
+
+
+def handle_tool_end_v2(event):
+    
+    return ToolEndEvent(
+        type='tool_end',
+        tool=event['name'],
+    )
+
+
+
+def handle_source_event(event):
+    docs = event.get('data', {}).get('input').get('documents')
+    sources = [
+        Source(
+            page=document.metadata.get('source').get('page_no'),
+            source=document.metadata.get('source').get('file_name', ''),
+            score=document.metadata.get('source').get('score'),
+            preview=document.page_content
+        )
+        for document in docs
+    ]
+    return SourcesEvent(
+        type='sources',
+        sources=sources
     )

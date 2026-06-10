@@ -7,12 +7,7 @@ from pydantic import BaseModel
 from app.schema.conversation import ConversationResponse
 
 
-
-class InputQuery(BaseModel):
-    thread_id: uuid.UUID
-    query: str
-
-    
+ 
 
 
 class BaseStreamEvent(BaseModel):

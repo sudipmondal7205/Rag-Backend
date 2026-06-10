@@ -52,6 +52,11 @@ class Settings(BaseSettings) :
     GMAIL_CLIENT_SECRET: str
     GMAIL_SENDER: str
 
+
+    SUPABASE_URL: str
+    SUPABASE_ANON_KEY: str
+
+
     
     @property
     def API_VERSION_PREFIX(self) -> str:
