@@ -22,21 +22,18 @@ router = APIRouter(prefix="/conversation", tags=['conversation'])
 async def get_all_messages(
         conv_id: uuid.UUID,
         current_user: Annotated[TokenUser, Depends(get_current_user)],
-        session: Annotated[AsyncSession, Depends(get_session)],
         conversation_service: Annotated[ConversationService, Depends(get_conversation_service)]
     ):
-
-    return await conversation_service.get_messages(thread_id=conv_id, user_id=current_user.id, session=session)
+    return await conversation_service.get_messages(thread_id=conv_id, user_id=current_user.id)
 
 
 
 @router.get("/get-all", response_model=list[ConversationResponse])
 async def get_conversations_by_user(
         current_user: Annotated[TokenUser, Depends(get_current_user)], 
-        session: Annotated[AsyncSession, Depends(get_session)], 
         conversation_service: Annotated[ConversationService, Depends(get_conversation_service)]
     ):
-        conversations = await conversation_service.get_conversations_by_user(session, current_user.id)
+        conversations = await conversation_service.get_conversations_by_user(current_user.id)
         return conversations
 
 
@@ -44,10 +41,9 @@ async def get_conversations_by_user(
 async def create_conversation(
         conversation: ConversationCreate,
         current_user: Annotated[TokenUser, Depends(get_current_user)],
-        session: Annotated[AsyncSession, Depends(get_session)],
         conversation_service: Annotated[ConversationService, Depends(get_conversation_service)]
     ):
-    return await conversation_service.create_conversation(session, conversation)
+    return await conversation_service.create_conversation(current_user.id, conversation)
 
 
 

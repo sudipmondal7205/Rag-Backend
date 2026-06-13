@@ -9,9 +9,9 @@ class CredentialException(HTTPException):
 
 
 class VerificationException(HTTPException):
-    def __init__(self, detail = None):
+    def __init__(self, status_code = HTTPStatus.UNAUTHORIZED, detail = None):
         super().__init__(
-            status_code=HTTPStatus.UNAUTHORIZED, 
+            status_code=status_code,
             detail=detail
         )
 

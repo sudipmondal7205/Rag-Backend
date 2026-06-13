@@ -59,7 +59,7 @@ async def query_documents(query: str, doc_id: str):
 
     results = pinecone_index.query(
         vector=vector,
-        top_k=5,
+        top_k=3,
         include_metadata=True,
         filter={
             "doc_id": doc_id

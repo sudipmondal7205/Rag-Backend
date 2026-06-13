@@ -3,21 +3,22 @@ from pydantic import BaseModel, ConfigDict, EmailStr
 
 
 class UserCreate(BaseModel):
-    name: str
-    password: str
     email: EmailStr
+    password: str
+    full_name: str
 
 
 class UserResponse(BaseModel):
     id: uuid.UUID
-    name: str
-    email: str
+    email: EmailStr
+    full_name: str
+    profile_pic: str | None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class UserLogin(BaseModel):
-    name: str
+    email: EmailStr
     password: str
 
     model_config = ConfigDict(from_attributes=True)
@@ -30,4 +31,4 @@ class UserVerifySchema(BaseModel):
 
 class TokenUser(BaseModel):
     id: uuid.UUID
-    name: str
+    email: EmailStr

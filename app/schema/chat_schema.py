@@ -1,7 +1,10 @@
 from typing import Literal, Optional, List, Union, Any
+from langchain_classic.schema import Document
 from pydantic import BaseModel
 from typing import Any, Dict, Optional
 import uuid
+
+from app.schema.stream_events import Source
 
 
 
@@ -29,4 +32,4 @@ class ChatUserMessage(ChatMessage):
 
 class ChatAiMessage(ChatMessage):
     role: Literal['assistant']
-    sources: List[ChatSource] = []
+    sources: List[Source] = []

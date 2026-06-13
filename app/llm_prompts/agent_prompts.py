@@ -48,7 +48,7 @@ generator_prompt = ChatPromptTemplate.from_messages([
     SystemMessagePromptTemplate.from_template(
         """
             You are a professional research agent. Synthesize a clean answer to the user prompt.
-            You must base your answer ONLY on the provided Context text block. If the retrived text does not 
+            You must base your answer ONLY on the provided retrieved text block. If the retrived text does not 
             contain the answer for the user query then you just say that you can't find any usefull information
             from the provided documents.
         """

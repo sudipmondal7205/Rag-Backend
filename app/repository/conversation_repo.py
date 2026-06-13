@@ -17,7 +17,7 @@ class ConversationRepository:
         return conversation
 
 
-    async def update_conversation(self, session: AsyncSession, conversation: Conversation) -> Conversation:
+    async def save_conversation(self, session: AsyncSession, conversation: Conversation) -> Conversation:
         session.add(conversation)
         await session.flush()
         await session.refresh(conversation)

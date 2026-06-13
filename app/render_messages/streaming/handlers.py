@@ -1,5 +1,5 @@
 from pprint import pprint
-
+from langchain_core.runnables.schema import StreamEvent
 from app.schema.stream_events import Source, SourcesEvent, StatusEvent, TokenEvent, ToolEndEvent, ToolStartEvent
 
 
@@ -23,8 +23,6 @@ def handle_status_event(event):
     )
 
 
-def handle_source_event(event):
-    pass
 
 
 def handle_tool_start(event):
@@ -54,8 +52,8 @@ def handle_tool_end_v2(event):
 
 
 
-def handle_source_event(event):
-    docs = event.get('data', {}).get('input').get('documents')
+def handle_source_event(event: StreamEvent):
+    docs = event.get('data', {}).get('output', {}).get('documents', [])
     sources = [
         Source(
             page=document.metadata.get('source').get('page_no'),

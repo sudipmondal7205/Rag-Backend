@@ -5,6 +5,7 @@ import uuid
 from pydantic import BaseModel
 
 from app.schema.conversation import ConversationResponse
+from app.schema.document import DocumentResponse
 
 
  
@@ -91,9 +92,7 @@ StreamEvent = Union[
 ]
 
 
-
-
 class DocUploadEvent(BaseModel):
     percentage: int
-    status: Literal["Uploading...", "Done"]
-    conversation: ConversationResponse = None
+    status: str
+    document: DocumentResponse = None

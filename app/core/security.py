@@ -19,6 +19,7 @@ def hash_password(password: str) -> str:
     return ph.hash(password)
 
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
         return ph.verify(hashed_password, plain_password)
@@ -28,6 +29,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     
     except Exception as e:
         raise HTTPException(status_code=HTTPStatus.UNAUTHORIZED, detail=str(e))
+
 
 
 def create_access_token(data: dict) -> str:

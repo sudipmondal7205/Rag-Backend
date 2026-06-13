@@ -1,5 +1,4 @@
 from io import BytesIO
-
 from fastapi.responses import StreamingResponse
 from langchain.chat_models import BaseChatModel
 from langchain.embeddings import Embeddings
@@ -10,12 +9,11 @@ from app.exceptions.file_exception import FileException
 from app.exceptions.security_exception import UnauthorizedUserException
 from app.models.conversation import Conversation
 from app.models.document import DocumentFile
-from app.models.user import User
 from app.repository.conversation_repo import ConversationRepository
 from sqlmodel.ext.asyncio.session import AsyncSession
 from app.repository.document_repo import DocumentRepository
 from app.schema.agent_schema import GenerateTitle
-from app.schema.conversation import ConversationResponse
+from app.schema.document import DocumentResponse
 from app.schema.stream_events import DocUploadEvent
 from langchain_core.prompts import ChatPromptTemplate
 from app.core.pinecone_client import pinecone_index
@@ -58,67 +56,70 @@ class DocumentService:
         else:
             doc_id = str(uuid.uuid4())
             conversation = Conversation(doc_id=doc_id, user_id=user_id)
-            conversation = await self._conversation_repo.create_conversation(self._session, conversation)
-
+            conversation = await self._conversation_repo.save_conversation(self._session, conversation)
 
         document_file = DocumentFile(
             filename=file.filename,
             content_type=file.content_type,
             conversation_id=conversation.id
         )
+
         supabase_file_path = f"users/{user_id}/conversation/{conversation.id}/{document_file.id}/{file.filename}"
         document_file.file_path = supabase_file_path
 
-        file_bytes = await file.read()
-        try:
-            await self._supabase_client.storage.from_("documents").upload(
-                path=supabase_file_path,
-                file=file_bytes,
-                file_options={"content-type": file.content_type, "upsert": "true"}
-            )
-        except Exception as e:
-            raise FileException(f"Could not upload file: {str(e)}")
+        async def progress_generator():
+            file_bytes = await file.read()
+            try:
+                yield f"data: {DocUploadEvent(percentage=0, status="Uploading file...").model_dump_json()}\n\n"
+                await self._supabase_client.storage.from_("documents").upload(
+                    path=supabase_file_path,
+                    file=file_bytes,
+                    file_options={"content-type": file.content_type, "upsert": "true"}
+                )
+                yield  f"data: {DocUploadEvent(percentage=100, status="File upload complete...").model_dump_json()}\n\n"
+            except Exception as e:
+                raise FileException(f"Could not upload file: {str(e)}")
 
-        created_document = await self._document_repo.create_document(self._session, document_file)
+            created_document = await self._document_repo.create_document(self._session, document_file)
 
+            async for event in self.process_pdf(file.filename, file_bytes, conversation):
+                yield event
 
-        return await self.process_pdf(file.filename, file_bytes, conversation)
+            await self._session.commit()
+            yield f"data: {DocUploadEvent(
+                percentage=100,
+                status='Done',
+                document=DocumentResponse.model_validate(created_document)
+            ).model_dump_json()}\n\n"
+
+        return StreamingResponse(progress_generator(), media_type="text/event-stream")
 
 
     async def process_pdf(self, filename: str, file_bytes: bytes, conversation: Conversation):
         batch_size = 30
-
         docs = self._get_file_docs(file_bytes, filename)
         list_docs = self._split_document(docs)
         
+        yield f"data: {DocUploadEvent(percentage=0, status="Processing...").model_dump_json()}\n\n"
         if len(list_docs) == 0:
             raise FileException(detail=f"Could not process {filename}")
-        
+
         if conversation.title is None or len(conversation.title) == 0:
             conversation.title = await self._generate_title(list_docs[0])
             
         batches = self._chunker(list_docs, batch_size)
 
-        async def progress_generator():
-            for i, chunk in enumerate(batches, start=1):
+        for i, chunk in enumerate(batches, start=1):
 
-                await self._upsert_document(chunk, conversation.doc_id)
+            await self._upsert_document(chunk, conversation.doc_id)
 
-                completed = min((batch_size * i), len(list_docs))
-                percentage = (completed / len(list_docs)) * 100
+            completed = min((batch_size * i), len(list_docs))
+            percentage = (completed / len(list_docs)) * 100
 
-                yield f"data: {DocUploadEvent(percentage=int(percentage), status='Uploading...').model_dump_json()}\n\n"
-            
-            updated_conversation = await self._conversation_repo.update_conversation(self._session, conversation)
-            await self._session.commit()
+            yield f"data: {DocUploadEvent(percentage=int(percentage), status='Processing...').model_dump_json()}\n\n"
+        
+        await self._conversation_repo.save_conversation(self._session, conversation)
 
-            yield f"data: {DocUploadEvent(
-                percentage=100,
-                status='Done',
-                conversation=ConversationResponse.model_validate(updated_conversation)
-            ).model_dump_json()}\n\n"
-
-        return StreamingResponse(progress_generator(), media_type="text/event-stream")
 
         
 
@@ -185,12 +186,13 @@ class DocumentService:
     
 
 
-    async def get_documents_of_conversation(self, user_id: uuid.UUID, conversation_id: uuid.UUID):
+    async def get_documents_of_conversation(self, user_id: uuid.UUID, conversation_id: uuid.UUID) -> list[DocumentResponse]:
         conversation = await self._conversation_repo.get_conversation(self._session, conversation_id)
         if conversation is None or (conversation.user_id != user_id):
             raise ConversationNotFoundException(conversation_id)
         
-        return await self._document_repo.get_documents_of_conversation(self._session, conversation_id)
+        documents = await self._document_repo.get_documents_of_conversation(self._session, conversation_id)
+        return [DocumentResponse.model_validate(doc) for doc in documents]
     
     
 

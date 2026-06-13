@@ -2,7 +2,7 @@ from typing import Annotated
 import uuid
 from fastapi import APIRouter, Depends, File, UploadFile
 from app.api.deps import get_current_user, get_doc_service
-from app.models.user import User
+from app.schema.document import DocumentResponse
 from app.schema.user import TokenUser
 from app.services.document_service import DocumentService
 
@@ -29,7 +29,7 @@ async def upload_new_docs(
     return await document_service.upload_document(file, current_user.id, None)
 
 
-@router.get("/get_document/conversation/{conversation_id}/all")
+@router.get("/get_document/conversation/{conversation_id}/all", response_model=list[DocumentResponse])
 async def get_documents_of_conversation(
         conversation_id: uuid.UUID,
         current_user: Annotated[TokenUser, Depends(get_current_user)],

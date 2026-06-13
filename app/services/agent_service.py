@@ -74,7 +74,7 @@ class AgentService:
             new_query = new_query.content.strip()
             state_msg = AIMessage(
                 content="Refining my documentation lookup to isolate data...",
-                tool_calls=[{"name": "retriever", "args": {'query': new_query}, "id": "retry_call_id_" + str(state.get("loop_count", 0))}]
+                tool_calls=[{"name": "retriever", "args": {'query': new_query}, "id": f"retry_call_id_{uuid.uuid4().hex}"}]
             )
             return {
                 'messages': [state_msg],
@@ -83,11 +83,25 @@ class AgentService:
             }
         
         async def generator(state: AgentState, runtime: Runtime[AgentContext]):
+            if state['grade_result'] == 'no':
+                return {
+                    "messages": [AIMessage(
+                        content="I could not find any relavent information from the provided documents.",
+                        response_metadata={
+                            "sources": state['documents'],
+                            "answer_given": "false"
+                        }
+                    )]
+                }
             retrieved_text = "\n\n".join([docs.page_content for docs in state['documents']])
             prompt = await generator_prompt.aformat_messages(user_query=state['user_query'], retrieved_text=retrieved_text)
             response = await self._llm.ainvoke(prompt)
             return {
-                "messages": [response]
+                "messages": [AIMessage(
+                    content=response.content, 
+                    response_metadata={"sources": state['documents'], "answer_given": "true"})
+                ],
+                "documents": state['documents']
             }
 
         def route_intent(state: AgentState, runtime: Runtime[AgentContext]):

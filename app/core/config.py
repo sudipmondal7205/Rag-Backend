@@ -1,10 +1,14 @@
+from typing import Literal
+
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings) :
 
-    DB: str = Field(default="postgresql")
+    BACKEND_URL: str
+
+    DB: str = "postgresql"
     DB_HOST: str
     DB_PORT: int
     DB_NAME: str
@@ -56,8 +60,22 @@ class Settings(BaseSettings) :
     SUPABASE_URL: str
     SUPABASE_ANON_KEY: str
 
-
+    DEFAULT_PROFILE_PICTURE_URL: str = "https://mdresuykkhrimmplcwum.supabase.co/storage/v1/object/public/avatars/default/default-profile-picture.jpg"
     
+
+    GOOGLE_CLIENT_ID: str
+    GOOGLE_CLIENT_SECRET: str
+    
+
+    GOOGLE_AUTH_URL: str = "https://accounts.google.com/o/oauth2/v2/auth"
+    GOOGLE_TOKEN_URL: str = "https://oauth2.googleapis.com/token"
+
+
+    @property
+    def REDIRECT_URI(self) -> str:
+        return f"{self.BACKEND_URL}/api/v1/auth/google/callback"
+    
+
     @property
     def API_VERSION_PREFIX(self) -> str:
         return (
@@ -67,6 +85,7 @@ class Settings(BaseSettings) :
     class Config:
         env_file = ".env"
         extra = "ignore"
+
 
 
 

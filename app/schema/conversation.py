@@ -13,7 +13,8 @@ class ConversationCreate(BaseModel):
 
 class ConversationResponse(BaseModel):
     id: uuid.UUID
-    title: str
+    title: str | None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+

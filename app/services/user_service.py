@@ -1,51 +1,84 @@
+from http import HTTPStatus
 import uuid
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import HTTPException, UploadFile
 from sqlmodel.ext.asyncio.session import AsyncSession
-from app.core.security import verify_password
-from app.exceptions.security_exception import UnauthorizedUserException
+from app.exceptions.file_exception import FileException
 from app.exceptions.user_exceptions import UserNotFoundException
-from app.models.user import User
 from app.repository.user_repo import UserRepository
-from app.schema.user import UserLogin, UserResponse
+from app.schema.user import TokenUser, UserResponse
+from supabase import AsyncClient
 
 
 class UserService:
 
-    def __init__(self, session: AsyncSession, user_repo: UserRepository):
-        self.repo = user_repo
-        self.session = session
+    def __init__(self, session: AsyncSession, supabase_client: AsyncClient, user_repo: UserRepository):
+        self._user_repo = user_repo
+        self._session = session
+        self._supabase_client = supabase_client
 
 
     async def get_user_by_id(self, user_id: uuid.UUID):
-        user = await self.repo.get_user_by_id(self.session, user_id)
+        user = await self._user_repo.get_user_by_id(self._session, user_id)
         return UserResponse.model_validate(user)
 
 
 
-    async def get_user_by_name(self, name: str):
-        return await self.repo.get_user_by_name(self.session, name)
+    async def get_user_by_email(self, email: str):
+        return await self._user_repo.get_user_by_email(self._session, email)
+
+
+
+    async def update_profile_picture(self, file: UploadFile, user_id: uuid.UUID):
+        allowed_extensions = ["image/jpeg", "image/jpg", "image/png", "image/webp"]
+
+        if file.content_type not in allowed_extensions:
+            raise FileException(
+                status_code=HTTPStatus.BAD_REQUEST, 
+                detail="Invalid file type. Only JPEG, PNG, and WebP are allowed."    
+            )
+        
+        file_bytes = await file.read()
+        file_extension = file.filename.split('.')[-1]
+        storage_path = f"profile/{user_id}/avatar.{file_extension}"
+
+        try:
+            await self._supabase_client.storage.from_("avatars").upload(
+                file=file_bytes,
+                path=storage_path,
+                file_options={"content-type": file.content_type, "upsert": "true"}
+            )
+            public_url_response = await self._supabase_client.storage.from_("avatars").get_public_url(storage_path)
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to save profile picture to cloud storage: {str(e)}")
+
+        user = await self._user_repo.get_user_by_id(self._session, user_id)
+        user.profile_pic = public_url_response
+        await self._user_repo.save_user(self._session, user)
+
+        return UserResponse.model_validate(user)
 
 
 
     async def get_all_users(self):
-        return await self.repo.get_all_users(self.session)
+        return await self._user_repo.get_all_users(self._session)
 
 
-
-    async def delete_user(self, user_data: OAuth2PasswordRequestForm):
-
-        existing_user = await self.repo.get_user_by_name(self.session, user_data.username)
+    
+    async def delete_user(self, current_user: TokenUser):
+        existing_user = await self._user_repo.get_user_by_id(self._session, current_user.id)
         if existing_user is None:
-            raise UserNotFoundException(user_data.username)
-        
-        if not verify_password(user_data.password, existing_user.password):
-            raise UnauthorizedUserException(f"Unauthorized user : {user_data.username}")
+            raise UserNotFoundException(current_user.email)
         
         try:
-            await self.repo.delete_user(self.session, existing_user)
-            await self.session.commit()
+            await self._user_repo.delete_user(self._session, existing_user)
+            await self._session.commit()
 
         except Exception as e:
-            raise RuntimeError(f"Exception occured : {str(e)}") from e
+            await self._session.rollback()
+            raise HTTPException(
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR, 
+                detail=f"Exception occured : {str(e)}"
+            )
 
 

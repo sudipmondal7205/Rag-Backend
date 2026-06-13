@@ -33,3 +33,13 @@ class GenerateTitle(BaseModel):
     title: str = Field(
         description="Title of a chat conversation"
     )
+
+
+
+class CitedAnswer(BaseModel):
+    answer: str = Field(
+        description="Provide a comprehensive answer based strictly on the text inside the provided DOC INDEX sections."
+    )
+    used_document_indexes: List[int] = Field(
+        description="The integer values matching the 'DOC INDEX X' headers of the blocks you extracted facts from."
+    )

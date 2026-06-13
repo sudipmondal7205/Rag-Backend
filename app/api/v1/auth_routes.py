@@ -1,10 +1,8 @@
 from typing import Annotated
-
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import EmailStr
 from app.api.deps import get_auth_service
-from app.schema.user import UserCreate, UserLogin, UserVerifySchema
+from app.schema.user import UserCreate, UserVerifySchema
 from app.services.auth_service import AuthService
 
 
@@ -38,3 +36,21 @@ async def verify(
         auth_service: Annotated[AuthService, Depends(get_auth_service)]
     ):
     return await auth_service.verify_user_email(data)
+
+
+
+@router.get("/google/login")
+async def get_google_login_url(
+        auth_service: Annotated[AuthService, Depends(get_auth_service)]
+    ):
+    return auth_service.google_login()
+    
+
+@router.get("/google/callback")
+async def google_callback(
+        auth_service: Annotated[AuthService, Depends(get_auth_service)],
+        code: Annotated[str, Query(...)]
+    ):
+    return await auth_service.google_callback(code)
+    
+    
