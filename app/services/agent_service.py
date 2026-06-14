@@ -10,7 +10,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from app.exceptions.conversation_exception import ConversationNotFoundException
 from app.render_messages.streaming.transformer import transform_events_v2
 from app.repository.conversation_repo import ConversationRepository
-from app.schema.agent_schema import AgentContext, AgentStateV2 as AgentState, GradeDocuments
+from app.schema.agent_schema import AgentContext, AgentState, GradeDocuments
 from app.schema.chat_schema import InputQuery
 from app.schema.stream_events import DoneEvent
 from app.tools.retriever_tool import retriever_tool
@@ -56,8 +56,8 @@ class AgentService:
             prompt = await grade_docs_prompt.aformat_messages(user_query=state['user_query'], retrieved_text=retrieved_text)
             assesment = await grade__llm.ainvoke(prompt)
             documents = state['documents']
-            if assesment.binary_score == 'no':
-                documents = []
+            # if assesment.binary_score == 'no':
+            #     documents = []
             return {
                 "grade_result": assesment.binary_score,
                 "documents": documents
@@ -83,16 +83,16 @@ class AgentService:
             }
         
         async def generator(state: AgentState, runtime: Runtime[AgentContext]):
-            if state['grade_result'] == 'no':
-                return {
-                    "messages": [AIMessage(
-                        content="I could not find any relavent information from the provided documents.",
-                        response_metadata={
-                            "sources": state['documents'],
-                            "answer_given": "false"
-                        }
-                    )]
-                }
+            # if state['grade_result'] == 'no':
+            #     return {
+            #         "messages": [AIMessage(
+            #             content="I could not find any relavent information from the provided documents.",
+            #             response_metadata={
+            #                 "sources": state['documents'],
+            #                 "answer_given": "false"
+            #             }
+            #         )]
+            #     }
             retrieved_text = "\n\n".join([docs.page_content for docs in state['documents']])
             prompt = await generator_prompt.aformat_messages(user_query=state['user_query'], retrieved_text=retrieved_text)
             response = await self._llm.ainvoke(prompt)
@@ -162,7 +162,7 @@ class AgentService:
         agent = self._build_agent()
         config = {"configurable": {"thread_id": input_query.thread_id}}
 
-        run_context = AgentContext(doc_id=conversation.doc_id)
+        run_context = AgentContext(conversation_id=str(conversation.id))
         initial_state = {
             "messages": [
                 system_message,

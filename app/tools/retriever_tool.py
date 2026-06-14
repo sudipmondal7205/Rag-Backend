@@ -1,3 +1,5 @@
+import uuid
+
 from langchain.tools import ToolRuntime
 from langchain_classic.schema import Document
 from langchain_core.tools import tool
@@ -22,11 +24,11 @@ async def retriever_tool(
         It will return top 3 relavent docs, use only related docs to answer.
     """
     
-    doc_id = runtime.context.get('doc_id')
+    conversation_id = runtime.context.conversation_id
 
     result = await query_documents(
         query=query,
-        doc_id=doc_id
+        conversation_id=conversation_id
     )
 
     docs = "\n\n".join(
@@ -51,7 +53,7 @@ async def retriever_tool(
 
 
 
-async def query_documents(query: str, doc_id: str):
+async def query_documents(query: str, conversation_id: str):
 
     embedding_model = get_embedding_model()
 
@@ -62,7 +64,7 @@ async def query_documents(query: str, doc_id: str):
         top_k=3,
         include_metadata=True,
         filter={
-            "doc_id": doc_id
+            "conversation_id": conversation_id
         }
     )
     return results

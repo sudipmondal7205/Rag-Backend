@@ -1,4 +1,7 @@
+from http import HTTPStatus
 from typing import Annotated, List
+
+from fastapi.responses import JSONResponse
 from app.api.deps import get_agent_service, get_conversation_service, get_current_user
 from app.models.user import User
 from app.schema.chat_schema import ChatMessage, InputQuery
@@ -55,3 +58,16 @@ async def chat_with_agent_stream(
         agent_service: Annotated[AgentService, Depends(get_agent_service)]
     ):
     return await agent_service.chat_stream(input_query, current_user.id, session)
+
+
+@router.delete("/delete-conversation/{conversation_id}")
+async def delete_conversation(
+        conversation_id: uuid.UUID,
+        current_user: Annotated[TokenUser, Depends(get_current_user)],
+        conversation_service: Annotated[ConversationService, Depends(get_conversation_service)]
+    ):
+    await conversation_service.delete_conversation(current_user.id, conversation_id)
+    return JSONResponse(
+        content="Conversation deleted successfully",
+        status_code=HTTPStatus.OK
+    )

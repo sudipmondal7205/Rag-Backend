@@ -36,10 +36,10 @@ async def delete_user(
         user_service: Annotated[UserService, Depends(get_user_service)]
     ):
 
-    await user_service.delete_user(current_user.id)
+    await user_service.delete_user(current_user)
     return JSONResponse(
         content=f"User with email {current_user.email} deleted successfully.",
-        status_code=HTTPStatus.NO_CONTENT
+        status_code=HTTPStatus.OK
     )
 
     

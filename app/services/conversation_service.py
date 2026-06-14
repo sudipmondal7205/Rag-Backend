@@ -1,15 +1,17 @@
 import pprint
-
 from app.exceptions.conversation_exception import ConversationNotFoundException
 from app.models.conversation import Conversation
 from app.render_messages.messages.build_messages import build_messages
 from app.repository.conversation_repo import ConversationRepository
+from app.repository.document_repo import DocumentRepository
 from app.schema.chat_schema import ChatMessage
 from app.schema.conversation import ConversationCreate, ConversationResponse
 from sqlmodel.ext.asyncio.session import AsyncSession
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg_pool import AsyncConnectionPool
 import uuid
+
+from app.services.document_service import DocumentService
 
 
 
@@ -18,9 +20,11 @@ class ConversationService:
     def __init__(
             self, pool: AsyncConnectionPool, 
             session: AsyncSession,  
-            conversation_repo: ConversationRepository
+            conversation_repo: ConversationRepository,
+            document_service: DocumentService
         ):
         self._conv_repo = conversation_repo
+        self._document_service = document_service
         self._checkpointer = AsyncPostgresSaver(pool)
         self._session = session
 
@@ -49,7 +53,6 @@ class ConversationService:
 
 
     async def get_messages(self, thread_id: uuid.UUID, user_id: uuid.UUID) -> list[ChatMessage]:
-
         conversation = await self._conv_repo.get_conversation(self._session, thread_id)
         if conversation is None or (conversation.user_id != user_id):
             raise ConversationNotFoundException(thread_id)
@@ -62,6 +65,24 @@ class ConversationService:
 
         messages = checkpoint_tuple.get("channel_values", {}).get("messages", [])
         chat_response = build_messages(messages)
-
         return chat_response
 
+
+
+    async def delete_conversation(self, user_id: uuid.UUID, conversation_id: uuid.UUID):
+        conversation = await self._conv_repo.get_conversation(self._session, conversation_id)
+        if conversation is None or (conversation.user_id != user_id):
+            raise ConversationNotFoundException(conversation_id)
+        
+        await self.delete_conversation_assets(conversation)
+
+
+
+    async def delete_conversation_assets(self, conversation: Conversation):
+        await self._document_service.delete_documents_for_conversation(conversation)
+        await self._checkpointer.adelete_thread(str(conversation.id))
+        await self._conv_repo.delete_conversation(self._session, conversation)
+        await self._session.commit()
+
+
+    

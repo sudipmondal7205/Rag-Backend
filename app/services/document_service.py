@@ -1,8 +1,10 @@
+import asyncio
 from io import BytesIO
 from fastapi.responses import StreamingResponse
 from langchain.chat_models import BaseChatModel
 from langchain.embeddings import Embeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from app.db.session import async_session_factory
 from app.exceptions.conversation_exception import ConversationNotFoundException
 from app.exceptions.document_exception import DocumentNotFoundException
 from app.exceptions.file_exception import FileException
@@ -14,7 +16,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.repository.document_repo import DocumentRepository
 from app.schema.agent_schema import GenerateTitle
 from app.schema.document import DocumentResponse
-from app.schema.stream_events import DocUploadEvent
+from app.schema.stream_events import DocUploadEvent, ErrorEvent
 from langchain_core.prompts import ChatPromptTemplate
 from app.core.pinecone_client import pinecone_index
 from langchain_core.documents import Document
@@ -54,8 +56,7 @@ class DocumentService:
             if conversation is None or conversation.user_id != user_id:
                 raise ConversationNotFoundException(conversation_id)
         else:
-            doc_id = str(uuid.uuid4())
-            conversation = Conversation(doc_id=doc_id, user_id=user_id)
+            conversation = Conversation(user_id=user_id)
             conversation = await self._conversation_repo.save_conversation(self._session, conversation)
 
         document_file = DocumentFile(
@@ -68,41 +69,89 @@ class DocumentService:
         document_file.file_path = supabase_file_path
 
         async def progress_generator():
-            file_bytes = await file.read()
+            created_document = None
+            uploaded_storage_path = None
+            completed = False
+            cancelled = False
+            async_results = []
+
             try:
+                file_bytes = await file.read()
                 yield f"data: {DocUploadEvent(percentage=0, status="Uploading file...").model_dump_json()}\n\n"
                 await self._supabase_client.storage.from_("documents").upload(
                     path=supabase_file_path,
                     file=file_bytes,
                     file_options={"content-type": file.content_type, "upsert": "true"}
                 )
-                yield  f"data: {DocUploadEvent(percentage=100, status="File upload complete...").model_dump_json()}\n\n"
+                uploaded_storage_path = supabase_file_path
+
+                created_document = await self._document_repo.create_document(self._session, document_file)
+                await self._session.commit()
+
+                yield  f"data: {DocUploadEvent(percentage=40, status="File upload complete...").model_dump_json()}\n\n"
+
+                async for event in self.process_pdf(
+                    file.filename, 
+                    file_bytes, 
+                    created_document,
+                    conversation,
+                    async_results
+                ):
+                    yield event
+        
+                await self._session.commit()
+                completed = True
+
+                yield f"data: {DocUploadEvent(
+                    percentage=100,
+                    status='Done',
+                    document=DocumentResponse.model_validate(created_document)
+                ).model_dump_json()}\n\n"
+
+            except asyncio.CancelledError:
+                cancelled = True
+                asyncio.create_task(self._cleanup_canceled_task(
+                        uploaded_storage_path, 
+                        created_document.id if created_document else None,
+                        async_results
+                    )
+                )
+                raise
+
             except Exception as e:
-                raise FileException(f"Could not upload file: {str(e)}")
+                yield f"data: {ErrorEvent(type='error', message=str(e)).model_dump_json()}\n\n"
+                
+            finally:
+                if cancelled:
+                    return
+                if not completed:
+                    if created_document is not None:
+                        await self._delete_document_vectors(created_document)
+                        await self._document_repo.delete_document(self._session, created_document)
+                        await self._session.commit()
+                    else:
+                        await self._session.rollback()
 
-            created_document = await self._document_repo.create_document(self._session, document_file)
+                    if uploaded_storage_path is not None:
+                        await self._supabase_client.storage.from_('documents').remove([uploaded_storage_path])
 
-            async for event in self.process_pdf(file.filename, file_bytes, conversation):
-                yield event
-
-            await self._session.commit()
-            yield f"data: {DocUploadEvent(
-                percentage=100,
-                status='Done',
-                document=DocumentResponse.model_validate(created_document)
-            ).model_dump_json()}\n\n"
 
         return StreamingResponse(progress_generator(), media_type="text/event-stream")
 
 
-    async def process_pdf(self, filename: str, file_bytes: bytes, conversation: Conversation):
+    async def process_pdf(self, filename: str,
+            file_bytes: bytes, 
+            document_file: DocumentFile, 
+            conversation: Conversation,
+            async_results: list
+        ):
         batch_size = 30
         docs = self._get_file_docs(file_bytes, filename)
         list_docs = self._split_document(docs)
-        
-        yield f"data: {DocUploadEvent(percentage=0, status="Processing...").model_dump_json()}\n\n"
+
         if len(list_docs) == 0:
-            raise FileException(detail=f"Could not process {filename}")
+            yield f"data: {ErrorEvent(type='error', message="Could not process file.").model_dump_json()}\n\n"
+            return
 
         if conversation.title is None or len(conversation.title) == 0:
             conversation.title = await self._generate_title(list_docs[0])
@@ -110,14 +159,16 @@ class DocumentService:
         batches = self._chunker(list_docs, batch_size)
 
         for i, chunk in enumerate(batches, start=1):
-
-            await self._upsert_document(chunk, conversation.doc_id)
+            result = await self._upsert_document(chunk, str(document_file.id), str(conversation.id))
+            async_results.append(result)
 
             completed = min((batch_size * i), len(list_docs))
-            percentage = (completed / len(list_docs)) * 100
+            percentage = (completed / len(list_docs)) * 50 + 40
 
             yield f"data: {DocUploadEvent(percentage=int(percentage), status='Processing...').model_dump_json()}\n\n"
         
+        for result in async_results:
+            result.get()
         await self._conversation_repo.save_conversation(self._session, conversation)
 
 
@@ -144,24 +195,24 @@ class DocumentService:
         return docs
 
 
-    async def _upsert_document(self, documents: list[Document], doc_id: str):
+    async def _upsert_document(self, documents: list[Document], document_id: str, conversation_id: str):
         texts = [doc.page_content for doc in documents]
         embeddings = await self._embedding_model.aembed_documents(texts)
         vectors = []
-        
         for doc, emb in zip(documents, embeddings):
             vectors.append({
                 "id": str(uuid.uuid4()),
                 "values": emb,
                 "metadata": {
-                    "doc_id": doc_id,
+                    "document_id": document_id,
+                    "conversation_id": conversation_id,
                     "text": doc.page_content,
                     "file_name": doc.metadata.get("file_name"),
                     "page_no": doc.metadata.get("page_no")
                 }
             })
-
-        pinecone_index.upsert(vectors, async_req=True)
+        response = pinecone_index.upsert(vectors, async_req=True)
+        return response
 
 
 
@@ -197,7 +248,6 @@ class DocumentService:
     
 
     async def get_document_stream(self, user_id: uuid.UUID, document_id: uuid.UUID):
-
         document = await self._document_repo.get_document(self._session, document_id)
         if document is None:
             raise DocumentNotFoundException(document_id)
@@ -216,3 +266,75 @@ class DocumentService:
             media_type=document.content_type,
             headers={"Content-Disposition": f"inline; filename={document.filename}"}
         )
+    
+    
+    async def _delete_document_vectors(self, document: DocumentFile):
+        pinecone_index.delete(
+            filter={
+                "document_id": str(document.id)
+            }
+        )
+
+    async def _delete_conversation_vectors(self, conversation: Conversation):
+        pinecone_index.delete(
+            filter={
+                "conversation_id": str(conversation.id)
+            }
+        )
+
+
+    async def _delete_storage_files(self, document_files: list[DocumentFile]):
+        file_paths = [document.file_path for document in document_files if document.file_path]
+        try:
+            if file_paths:
+                await self._supabase_client.storage.from_('documents').remove(file_paths)
+        except Exception as e:
+            raise FileException(detail=f"Could not remove file from cloud: {str(e)}")
+
+
+    async def delete_document(self, user_id: uuid.UUID, document_id: uuid.UUID):
+        document = await self._document_repo.get_document(self._session, document_id)
+        if document is None:
+            raise DocumentNotFoundException(document_id)
+
+        conversation = await self._conversation_repo.get_conversation(self._session, document.conversation_id)
+        if conversation is None or (conversation.user_id != user_id):
+            raise UnauthorizedUserException(detail="Unauthorized access to this asset.")
+        
+        await self._delete_document_vectors(document)
+        await self._delete_storage_files([document])
+        await self._document_repo.delete_document(self._session, document)
+        await self._session.commit()
+
+
+
+    async def delete_documents_for_conversation(self, conversation: Conversation):
+        document_files = await self._document_repo.get_documents_of_conversation(self._session, conversation.id)
+        await self._delete_conversation_vectors(conversation)
+        await self._delete_storage_files(list(document_files))
+
+
+
+    async def _cleanup_canceled_task(self, 
+            uploaded_storage_path: str | None, 
+            document_id: uuid.UUID | None, 
+            async_results: list
+        ):
+        async with async_session_factory() as session:
+            for result in async_results:
+                try:
+                    result.get()
+                except Exception:
+                    pass
+
+            if document_id is not None:
+                document = await self._document_repo.get_document(session, document_id)
+                if document is not None:
+                    await self._delete_document_vectors(document)
+                    await self._document_repo.delete_document(session, document)
+                await session.commit()
+
+        if uploaded_storage_path is not None:
+            await self._supabase_client.storage.from_('documents').remove([uploaded_storage_path])
+        
+        

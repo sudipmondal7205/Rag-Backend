@@ -63,23 +63,6 @@ def get_supabase_client(request: Request) -> AsyncClient:
     return request.app.state.supabase
 
 
-
-def get_user_service(
-        session: AsyncSession = Depends(get_session),
-        user_repo: UserRepository = Depends(get_user_repo),
-        supabase_client: AsyncClient = Depends(get_supabase_client)
-    ):
-    return UserService(session, supabase_client, user_repo)
-
-
-def get_auth_service(
-        session: AsyncSession = Depends(get_session),
-        redis_client: Redis = Depends(get_redis_client),
-        user_repo: UserRepository = Depends(get_user_repo)
-    ):
-    return AuthService(session, user_repo, redis_client, email_service)
-
-
 def get_doc_service(
         llm: BaseChatModel = Depends(get_llm),
         embedding: Embeddings = Depends(get_embedding_model),
@@ -94,9 +77,29 @@ def get_doc_service(
 async def get_conversation_service(
         pool: Annotated[AsyncConnectionPool, Depends(get_db_pool)],
         session: Annotated[AsyncSession, Depends(get_session)],
-        conversation_repo: Annotated[ConversationRepository, Depends(get_conversation_repo)]
+        conversation_repo: Annotated[ConversationRepository, Depends(get_conversation_repo)],
+        document_service: Annotated[DocumentService, Depends(get_doc_service)]
     ) -> ConversationService:
-    return ConversationService(pool, session, conversation_repo)
+    return ConversationService(pool, session, conversation_repo, document_service)
+
+
+def get_user_service(
+        session: AsyncSession = Depends(get_session),
+        user_repo: UserRepository = Depends(get_user_repo),
+        supabase_client: AsyncClient = Depends(get_supabase_client),
+        conversation_service: ConversationService = Depends(get_conversation_service),
+        conversation_repo: ConversationRepository = Depends(get_conversation_repo)
+    ):
+    return UserService(session, supabase_client, user_repo, conversation_service, conversation_repo)
+
+
+def get_auth_service(
+        session: AsyncSession = Depends(get_session),
+        redis_client: Redis = Depends(get_redis_client),
+        user_repo: UserRepository = Depends(get_user_repo)
+    ):
+    return AuthService(session, user_repo, redis_client, email_service)
+
 
 
 def get_agent_service(request: Request) -> AgentService:

@@ -4,18 +4,26 @@ from fastapi import HTTPException, UploadFile
 from sqlmodel.ext.asyncio.session import AsyncSession
 from app.exceptions.file_exception import FileException
 from app.exceptions.user_exceptions import UserNotFoundException
+from app.repository.conversation_repo import ConversationRepository
 from app.repository.user_repo import UserRepository
 from app.schema.user import TokenUser, UserResponse
 from supabase import AsyncClient
-
+from app.services.conversation_service import ConversationService
+from app.core.config import settings
 
 class UserService:
 
-    def __init__(self, session: AsyncSession, supabase_client: AsyncClient, user_repo: UserRepository):
+    def __init__(self, session: AsyncSession,
+        supabase_client: AsyncClient,
+        user_repo: UserRepository,
+        conv_service: ConversationService,
+        conversation_repo: ConversationRepository 
+    ):
         self._user_repo = user_repo
         self._session = session
         self._supabase_client = supabase_client
-
+        self._conversation_service = conv_service
+        self._conversation_repo = conversation_repo
 
     async def get_user_by_id(self, user_id: uuid.UUID):
         user = await self._user_repo.get_user_by_id(self._session, user_id)
@@ -71,6 +79,17 @@ class UserService:
             raise UserNotFoundException(current_user.email)
         
         try:
+            conversations = await self._conversation_repo.get_conversations_by_user(self._session, existing_user.id)
+            for conversation in conversations:
+                await self._conversation_service.delete_conversation_assets(conversation)
+
+            if existing_user.profile_pic.startswith(f"{settings.SUPABASE_URL}/storage/v1/object/public/avatars/profile", 0):
+                try:
+                    profile_pic_path = existing_user.profile_pic.removeprefix(f"{settings.SUPABASE_URL}/storage/v1/object/public/avatars/")
+                    await self._supabase_client.storage.from_('avatars').remove([profile_pic_path])
+                except Exception:
+                    pass
+
             await self._user_repo.delete_user(self._session, existing_user)
             await self._session.commit()
 

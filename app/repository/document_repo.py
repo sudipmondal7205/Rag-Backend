@@ -12,7 +12,7 @@ class DocumentRepository:
 
     async def create_document(self, session: AsyncSession, document: DocumentFile):
         session.add(document)
-        await session.commit()
+        await session.flush()
         await session.refresh(document)
         return document
     
@@ -25,3 +25,7 @@ class DocumentRepository:
         )
         result = await session.exec(statement)
         return result.all()
+    
+
+    async def delete_document(self, session: AsyncSession, document: DocumentFile):
+        await session.delete(document)

@@ -34,6 +34,8 @@ class ConversationRepository:
         return result.all()
     
 
+    async def delete_conversation(self, session: AsyncSession, conversation: Conversation):
+        await session.delete(conversation)
 
 
 

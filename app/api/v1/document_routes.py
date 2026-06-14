@@ -1,6 +1,8 @@
+from http import HTTPStatus
 from typing import Annotated
 import uuid
 from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi.responses import JSONResponse
 from app.api.deps import get_current_user, get_doc_service
 from app.schema.document import DocumentResponse
 from app.schema.user import TokenUser
@@ -18,6 +20,7 @@ async def upload_docs(
         document_service: Annotated[DocumentService, Depends(get_doc_service)]
     ):
     return await document_service.upload_document(file, current_user.id, conversation_id)
+    
 
 
 @router.post("/upload_document/new")
@@ -45,3 +48,16 @@ async def get_document(
         document_service: Annotated[DocumentService, Depends(get_doc_service)]
     ):
     return await document_service.get_document_stream(current_user.id, document_id)
+
+
+@router.delete("/delete-document/{document_id}")
+async def delete_document(
+        document_id: uuid.UUID,
+        current_user: Annotated[TokenUser, Depends(get_current_user)],
+        document_service: Annotated[DocumentService, Depends(get_doc_service)]
+    ):
+    await document_service.delete_document(current_user.id, document_id)
+    return JSONResponse(
+        content="Document successfully deleted.",
+        status_code=HTTPStatus.OK
+    )
