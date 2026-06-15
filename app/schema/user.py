@@ -1,5 +1,8 @@
+from typing import Literal
 import uuid
 from pydantic import BaseModel, ConfigDict, EmailStr
+
+from app.enums.user_enum import UserRole
 
 
 class UserCreate(BaseModel):
@@ -32,3 +35,4 @@ class UserVerifySchema(BaseModel):
 class TokenUser(BaseModel):
     id: uuid.UUID
     email: EmailStr
+    role: UserRole

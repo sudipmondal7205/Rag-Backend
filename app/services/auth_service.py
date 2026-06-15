@@ -44,19 +44,18 @@ class AuthService():
         
         return create_access_token({
             'id': str(user.id),
-            'email': user.email
+            'email': user.email,
+            'role': user.role
         })
     
 
 
     async def initiate_user_registration(self, user_data: UserCreate):
-        
         user = await self._user_repo.get_user_by_email(self._session, user_data.email)
         if user:
             raise UserAlreadyExistsException(user_data.email)
 
         code = str(secrets.randbelow(1000000)).zfill(6)
-        print("OTP: ", code)
         await self._redis_client.setex(f'verification_code:{user_data.email}', settings.REDIS_MEMORY_TIME, code)
         await self._redis_client.setex(f'temp_user:{user_data.email}', settings.REDIS_MEMORY_TIME, user_data.model_dump_json())
 
@@ -71,7 +70,6 @@ class AuthService():
 
 
     async def verify_user_email(self, data: UserVerifySchema):
-
         stored_code = await self._redis_client.get(f'verification_code:{data.email}')
 
         if stored_code is None or stored_code != data.verification_code:
@@ -154,9 +152,10 @@ class AuthService():
         
         user_data = {
             "id": str(user.id),
-            "email": email
+            "email": email,
+            "role": user.role
         }
         access_token = create_access_token(user_data)
 
-        redirect_url = f"http://localhost:3000/?token={access_token}"
+        redirect_url = f"{settings.FRONTEND_URL}/?token={access_token}"
         return RedirectResponse(url=redirect_url)

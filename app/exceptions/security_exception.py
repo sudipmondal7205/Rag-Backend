@@ -15,7 +15,6 @@ class VerificationException(HTTPException):
             detail=detail
         )
 
-
 class UnauthorizedUserException(HTTPException):
     def __init__(self, detail = None, headers = None):
         super().__init__(

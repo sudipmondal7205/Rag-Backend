@@ -2,7 +2,6 @@ from http import HTTPStatus
 from typing import Annotated
 from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.responses import JSONResponse
-from fastapi.security import OAuth2PasswordRequestForm
 from app.api.deps import get_current_user, get_user_service
 from app.schema.user import TokenUser, UserResponse
 from app.services.user_service import UserService
@@ -15,9 +14,10 @@ router = APIRouter(prefix="/user", tags=["user"])
 
 @router.get("/get-user/all")
 async def get_all_users(
+        current_user: Annotated[TokenUser, Depends(get_current_user)],
         user_service: Annotated[UserService, Depends(get_user_service)]
     ):
-    return await user_service.get_all_users()
+    return await user_service.get_all_users(current_user)
 
 
 

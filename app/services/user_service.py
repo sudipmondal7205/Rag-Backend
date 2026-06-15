@@ -1,8 +1,11 @@
 from http import HTTPStatus
 import uuid
 from fastapi import HTTPException, UploadFile
+from redis import Redis
 from sqlmodel.ext.asyncio.session import AsyncSession
+from app.enums.user_enum import UserRole
 from app.exceptions.file_exception import FileException
+from app.exceptions.security_exception import UnauthorizedUserException
 from app.exceptions.user_exceptions import UserNotFoundException
 from app.repository.conversation_repo import ConversationRepository
 from app.repository.user_repo import UserRepository
@@ -15,11 +18,13 @@ class UserService:
 
     def __init__(self, session: AsyncSession,
         supabase_client: AsyncClient,
+        redis: Redis,
         user_repo: UserRepository,
         conv_service: ConversationService,
         conversation_repo: ConversationRepository 
     ):
         self._user_repo = user_repo
+        self._redis_client = redis
         self._session = session
         self._supabase_client = supabase_client
         self._conversation_service = conv_service
@@ -68,9 +73,11 @@ class UserService:
 
 
 
-    async def get_all_users(self):
-        return await self._user_repo.get_all_users(self._session)
-
+    async def get_all_users(self, user: TokenUser):
+        if user.role == UserRole.ADMIN:
+            return await self._user_repo.get_all_users(self._session)
+        else:
+            raise UnauthorizedUserException(detail="Admin access required.")
 
     
     async def delete_user(self, current_user: TokenUser):
@@ -91,6 +98,7 @@ class UserService:
                     pass
 
             await self._user_repo.delete_user(self._session, existing_user)
+            await self._redis_client.setex(f"Deleted_user_id: {existing_user.id}", settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES, f"{existing_user.id}")
             await self._session.commit()
 
         except Exception as e:

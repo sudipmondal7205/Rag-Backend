@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.core.redis_client import get_redis_client
 from app.db.conv_checkpoint_pool import get_db_pool
 from app.db.session import get_session
-from app.exceptions.security_exception import CredentialException
+from app.exceptions.security_exception import CredentialException, VerificationException
 from app.repository.conversation_repo import ConversationRepository
 from app.repository.document_repo import DocumentRepository
 from app.repository.user_repo import UserRepository
@@ -30,21 +30,27 @@ from supabase import AsyncClient
 
 
 
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_VERSION_PREFIX}/auth/login")
 security_scheme = HTTPBearer()
 
-def get_current_user(
-        credentials: HTTPAuthorizationCredentials = Depends(security_scheme)
+async def get_current_user(
+        credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
+        redis_client: Redis = Depends(get_redis_client)
     ) -> TokenUser:
     try:
         token = credentials.credentials
         payload = jwt.decode(token=token, key=settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-
     except (JWTError) as e:
         raise CredentialException(HTTPStatus.UNAUTHORIZED, str(e))
 
-    return TokenUser.model_validate(payload)
+    token_user = TokenUser.model_validate(payload)
+    deleted_user = await redis_client.get(f"Deleted_user_id: {token_user.id}")
+    if deleted_user:
+        raise VerificationException(
+            status_code=HTTPStatus.NOT_FOUND,
+            detail="User deleted" 
+        )
+    return token_user
 
 
 
@@ -84,13 +90,14 @@ async def get_conversation_service(
 
 
 def get_user_service(
+        redis: Redis = Depends(get_redis_client),
         session: AsyncSession = Depends(get_session),
         user_repo: UserRepository = Depends(get_user_repo),
         supabase_client: AsyncClient = Depends(get_supabase_client),
         conversation_service: ConversationService = Depends(get_conversation_service),
         conversation_repo: ConversationRepository = Depends(get_conversation_repo)
     ):
-    return UserService(session, supabase_client, user_repo, conversation_service, conversation_repo)
+    return UserService(session, supabase_client, redis, user_repo, conversation_service, conversation_repo)
 
 
 def get_auth_service(

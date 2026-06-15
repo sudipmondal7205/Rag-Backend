@@ -7,7 +7,8 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings) :
 
     BACKEND_URL: str
-
+    FRONTEND_URL: str
+    
     DB: str = "postgresql"
     DB_HOST: str
     DB_PORT: int
