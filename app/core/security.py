@@ -28,7 +28,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return False
     
     except Exception as e:
-        raise HTTPException(status_code=HTTPStatus.UNAUTHORIZED, detail=str(e))
+        raise HTTPException(status_code=HTTPStatus.UNAUTHORIZED, detail="Could not verify password")
 
 
 

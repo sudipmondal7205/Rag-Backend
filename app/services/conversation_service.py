@@ -74,7 +74,12 @@ class ConversationService:
         if conversation is None or (conversation.user_id != user_id):
             raise ConversationNotFoundException(conversation_id)
         
-        await self.delete_conversation_assets(conversation)
+        try:
+            await self.delete_conversation_assets(conversation)
+            await self._session.commit()
+        except:
+            await self._session.rollback()
+            print("Deletion failed of conversation Id: ", conversation_id)
 
 
 
@@ -82,7 +87,6 @@ class ConversationService:
         await self._document_service.delete_documents_for_conversation(conversation)
         await self._checkpointer.adelete_thread(str(conversation.id))
         await self._conv_repo.delete_conversation(self._session, conversation)
-        await self._session.commit()
 
 
     

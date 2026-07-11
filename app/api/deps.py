@@ -31,14 +31,23 @@ from supabase import AsyncClient
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_VERSION_PREFIX}/auth/login")
-security_scheme = HTTPBearer()
+security_scheme = HTTPBearer(auto_error=False)
 
 async def get_current_user(
-        credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
+        request: Request,
+        credentials: HTTPAuthorizationCredentials | None = Depends(security_scheme),
         redis_client: Redis = Depends(get_redis_client)
     ) -> TokenUser:
-    try:
+    token = None
+    if credentials is not None:
         token = credentials.credentials
+    else:
+        token = request.query_params.get("token")
+
+    if not token:
+        raise CredentialException(HTTPStatus.UNAUTHORIZED, "Not authenticated")
+
+    try:
         payload = jwt.decode(token=token, key=settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
     except (JWTError) as e:
         raise CredentialException(HTTPStatus.UNAUTHORIZED, str(e))

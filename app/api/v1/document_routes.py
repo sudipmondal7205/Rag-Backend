@@ -1,9 +1,11 @@
 from http import HTTPStatus
 from typing import Annotated
 import uuid
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
+from starlette import status
 from app.api.deps import get_current_user, get_doc_service
+from app.core.config import settings
 from app.schema.document import DocumentResponse
 from app.schema.user import TokenUser
 from app.services.document_service import DocumentService
@@ -19,6 +21,17 @@ async def upload_docs(
         current_user: Annotated[TokenUser, Depends(get_current_user)],
         document_service: Annotated[DocumentService, Depends(get_doc_service)]
     ):
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file extension. Only PDF files are allowed."
+        )
+        
+    if file.content_type != settings.ALLOWED_MIME_TYPE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file type. Content must be a application/pdf."
+        )
     return await document_service.upload_document(file, current_user.id, conversation_id)
     
 
@@ -29,6 +42,17 @@ async def upload_new_docs(
         current_user: Annotated[TokenUser, Depends(get_current_user)],
         document_service: Annotated[DocumentService, Depends(get_doc_service)]
     ):
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file extension. Only PDF files are allowed."
+        )
+        
+    if file.content_type != settings.ALLOWED_MIME_TYPE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file type. Content must be a application/pdf."
+        )
     return await document_service.upload_document(file, current_user.id, None)
 
 

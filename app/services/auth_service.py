@@ -1,5 +1,5 @@
 from app.core.security import create_access_token, hash_password, verify_password
-from app.exceptions.security_exception import CredentialException, VerificationException
+from app.exceptions.security_exception import CredentialException, UnauthorizedUserException, VerificationException
 from app.exceptions.user_exceptions import UserAlreadyExistsException, UserNotFoundException
 from app.repository.user_repo import UserRepository
 from app.schema.user import UserCreate, UserResponse, UserVerifySchema
@@ -144,6 +144,9 @@ class AuthService():
                 profile_pic=picture_url
             )
             user = await self._user_repo.save_user(self._session, user)
+        
+        elif user.password != 'OAUTH_NATIVE_USER':
+            raise UnauthorizedUserException(detail="Login is prohivited using this method")
 
         else:
             if user.profile_pic != picture_url:

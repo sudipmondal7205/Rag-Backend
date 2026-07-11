@@ -72,6 +72,8 @@ class Settings(BaseSettings) :
     GOOGLE_TOKEN_URL: str = "https://oauth2.googleapis.com/token"
 
 
+    ALLOWED_MIME_TYPE: str = "application/pdf"
+
     @property
     def REDIRECT_URI(self) -> str:
         return f"{self.BACKEND_URL}/api/v1/auth/google/callback"
