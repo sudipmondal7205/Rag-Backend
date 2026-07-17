@@ -21,17 +21,6 @@ async def upload_docs(
         current_user: Annotated[TokenUser, Depends(get_current_user)],
         document_service: Annotated[DocumentService, Depends(get_doc_service)]
     ):
-    if not file.filename.lower().endswith('.pdf'):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid file extension. Only PDF files are allowed."
-        )
-        
-    if file.content_type != settings.ALLOWED_MIME_TYPE:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid file type. Content must be a application/pdf."
-        )
     return await document_service.upload_document(file, current_user.id, conversation_id)
     
 

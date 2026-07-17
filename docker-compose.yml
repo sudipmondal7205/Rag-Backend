@@ -1,0 +1,10 @@
+services:
+  app:
+    image: nova7205/agentic-rag:latest
+    container_name: rag-application-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+      

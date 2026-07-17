@@ -6,7 +6,6 @@
 tests/*
 venv/*
 .vscode/*
-notebooks/*
 
 pytest.ini
 test.py
