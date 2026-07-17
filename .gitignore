@@ -1,6 +1,5 @@
 *.env
 *.pyc
-*.ipynb
 
 
 tests/*
